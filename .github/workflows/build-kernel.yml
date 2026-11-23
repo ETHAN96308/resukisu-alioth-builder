@@ -222,8 +222,20 @@ jobs:
             CROSS_COMPILE=$CROSS_COMPILE \
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
             LOCALVERSION="-ReSukiSU-SUSFS" \
-            -j$(nproc --all) \
-            2>&1 | tail -100
+            -j$(nproc --all) Image.gz-dtb dtbo.img dtb.img || make O=out \
+            ARCH=arm64 \
+            CC="ccache clang" \
+            CXX="ccache clang++" \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            CLANG_TRIPLE=$CLANG_TRIPLE \
+            CROSS_COMPILE=$CROSS_COMPILE \
+            CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
+            LOCALVERSION="-ReSukiSU-SUSFS" \
+            -j$(nproc --all) Image
           
           END=$(date +%s)
           echo ":: Build took $(( END - START )) seconds"
