@@ -43,7 +43,7 @@ on:
       defconfig:
         description: 'Kernel defconfig name'
         required: true
-        default: 'vendor_alioth-perf_defconfig'
+        default: 'alioth_defconfig'
         type: string
 
 jobs:
