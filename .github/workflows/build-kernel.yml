@@ -127,96 +127,16 @@ jobs:
         run: |
           cd $HOME/kernel
           echo ":: Integrating ReSukiSU from ${{ inputs.ksu_repo }}..."
-          
-          # Method 1: Use rsuntk's setup script
           curl -LSs "https://raw.githubusercontent.com/${{ inputs.ksu_repo }}/${{ inputs.ksu_branch }}/kernel/setup.sh" | bash -s ${{ inputs.ksu_branch }}
           
-          # Verify integration
-          if [ -d "KernelSU" ] || [ -d "drivers/kernelsu" ]; then
-            echo "✓ ReSukiSU integrated successfully"
-            # Show KSU version
-            if [ -f "KernelSU/kernel/ksu.h" ]; then
-              grep -i "KSU_VERSION" KernelSU/kernel/ksu.h || true
-            fi
-          else
-            echo ":: Setup script method failed, trying manual integration..."
-            
-            # Method 2: Manual clone and link
-            git clone --depth=1 https://github.com/${{ inputs.ksu_repo }}.git -b ${{ inputs.ksu_branch }} $HOME/KernelSU
-            
-            ln -sf $HOME/KernelSU/kernel drivers/kernelsu
-            
-            # Add to Kconfig
-            if ! grep -q "kernelsu" drivers/Kconfig; then
-              sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
-            fi
-            
-            # Add to Makefile
-            if ! grep -q "kernelsu" drivers/Makefile; then
-              echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
-            fi
-            
-            echo "✓ ReSukiSU manually integrated"
-          fi
-
-      # ========================================
-      #  INTEGRATE SUSFS
-      # ========================================
-      - name: Clone SUSFS
-        run: |
-          echo ":: Cloning SUSFS (branch: ${{ inputs.susfs_branch }})..."
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git \
-            -b ${{ inputs.susfs_branch }} \
-            $HOME/susfs4ksu
-
-      - name: Apply SUSFS patches
-        run: |
-          cd $HOME/kernel
+          # Add SUSFS files directly without breaking mainline patches
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b kernel-4.19 $HOME/susfs4ksu
+          cp -v $HOME/susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c || cp -v $(find $HOME/susfs4ksu -name "susfs.c") fs/susfs.c || true
+          cp -v $HOME/susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h || cp -v $(find $HOME/susfs4ksu -name "susfs.h") include/linux/susfs.h || true
           
-          # --- Apply KSU-side SUSFS patch ---
-          echo ":: Applying SUSFS patch to KernelSU..."
-          KSU_DIR=""
-          if [ -d "$HOME/kernel/KernelSU" ]; then
-            KSU_DIR="$HOME/kernel/KernelSU"
-          elif [ -d "$HOME/KernelSU" ]; then
-            KSU_DIR="$HOME/KernelSU"
-          fi
-          
-          if [ -n "$KSU_DIR" ]; then
-            KSU_PATCH=$(find "$HOME/susfs4ksu" -name "*enable_susfs_for_ksu*.patch" -type f | head -1)
-            if [ -n "$KSU_PATCH" ]; then
-              cd "$KSU_DIR"
-              patch -p1 --forward < "$KSU_PATCH" || echo "⚠ KSU SUSFS patch may already be applied or needs manual fixing"
-              cd $HOME/kernel
-              echo "✓ SUSFS KSU patch applied"
-            else
-              echo "⚠ No KSU-side SUSFS patch found"
-            fi
-          fi
-          
-          # --- Copy SUSFS source files ---
-          echo ":: Copying SUSFS source files..."
-          
-          SUSFS_C=$(find "$HOME/susfs4ksu" -name "susfs.c" -type f | head -1)
-          if [ -n "$SUSFS_C" ]; then
-            cp -v "$SUSFS_C" fs/susfs.c
-            echo "✓ Copied susfs.c → fs/"
-          fi
-          
-          SUSFS_H=$(find "$HOME/susfs4ksu" -name "susfs.h" -type f | head -1)
-          if [ -n "$SUSFS_H" ]; then
-            cp -v "$SUSFS_H" include/linux/susfs.h
-            echo "✓ Copied susfs.h → include/linux/"
-          fi
-          
-          # --- Apply kernel-side SUSFS patch ---
-          echo ":: Applying kernel-side SUSFS patch..."
-          KERNEL_PATCH=$(find "$HOME/susfs4ksu" -name "*add_susfs_in_kernel*4.19*.patch" -type f | head -1)
-          if [ -n "$KERNEL_PATCH" ]; then
-            patch -p1 --forward < "$KERNEL_PATCH" || echo "⚠ Kernel SUSFS patch had conflicts — check build output"
-            echo "✓ Kernel-side SUSFS patch applied"
-          else
-            echo "⚠ No kernel-4.19 SUSFS patch found"
+          # Add susfs.o to fs/Makefile cleanly
+          if ! grep -q "CONFIG_KSU_SUSFS" fs/Makefile; then
+            echo 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' >> fs/Makefile
           fi
 
       # ========================================
