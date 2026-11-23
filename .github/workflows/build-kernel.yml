@@ -161,6 +161,11 @@ jobs:
           echo ":: Enabling KernelSU + SUSFS config flags..."
           cat >> out/.config << 'EOF'
           
+          # Enable Backlight class device required by techpack display
+          CONFIG_BACKLIGHT_CLASS_DEVICE=y
+          CONFIG_BACKLIGHT_GENERIC=y
+          CONFIG_BACKLIGHT_QCOM_WLED=y
+
           # KernelSU (ReSukiSU)
           CONFIG_KSU=y
           CONFIG_KSU_DEBUG=n
@@ -222,7 +227,7 @@ jobs:
             CROSS_COMPILE=$CROSS_COMPILE \
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
             LOCALVERSION="-ReSukiSU-SUSFS" \
-            -j$(nproc --all) Image.gz-dtb dtbo.img dtb.img || make O=out \
+            -j$(nproc --all) Image.gz-dtb dtbo.img || make O=out \
             ARCH=arm64 \
             CC="ccache clang" \
             CXX="ccache clang++" \
